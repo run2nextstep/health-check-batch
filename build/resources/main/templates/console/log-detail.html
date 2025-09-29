@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{console/layout :: layout(~{::content}, ~{::scripts}, 'Log Details')}">
+<head>
+  <title>Log Details</title>
+</head>
+<body>
+<div th:fragment="content">
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/console/">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/console/logs">Logs</a></li>
+      <li class="breadcrumb-item active">Log Details</li>
+    </ol>
+  </nav>
+
+  <!-- Log Details Card -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+          <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-list-alt"></i> Execution Log Details
+          </h6>
+          <div>
+                            <span th:if="${log.success}" class="badge bg-success">
+                                <i class="fas fa-check"></i> Success
+                            </span>
+            <span th:unless="${log.success}" class="badge bg-danger">
+                                <i class="fas fa-times"></i> Failed
+                            </span>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Basic Information -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <h6 class="text-muted">Server Information</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td><strong>Server Name:</strong></td>
+                  <td th:text="${log.serverName}">-</td>
+                </tr>
+                <tr>
+                  <td><strong>URL:</strong></td>
+                  <td><code th:text="${log.url}">-</code></td>
+                </tr>
+                <tr>
+                  <td><strong>HTTP Method:</strong></td>
+                  <td>
+                    <span class="badge bg-secondary" th:text="${log.method}">-</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Environment:</strong></td>
+                  <td>
+                    <span class="badge bg-info" th:text="${log.environment}">-</span>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-muted">Execution Details</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td><strong>Execution Time:</strong></td>
+                  <td th:text="${#temporals.format(log.executionTime, 'yyyy-MM-dd HH:mm:ss')}">-</td>
+                </tr>
+                <tr>
+                  <td><strong>Response Time:</strong></td>
+                  <td>
+                                            <span th:class="${log.elapsedTimeMs < 1000 ? 'response-time-good' :
+                                                            (log.elapsedTimeMs < 5000 ? 'response-time-slow' : 'response-time-bad')}"
+                                                  th:text="${log.elapsedTimeMs} + 'ms'">-</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Status Code:</strong></td>
+                  <td>
+                                            <span th:if="${log.statusCode != null and log.statusCode > 0}"
+                                                  class="badge"
+                                                  th:classappend="${log.statusCode >= 200 and log.statusCode < 300 ? 'bg-success' :
+                                                                 (log.statusCode >= 400 ? 'bg-danger' : 'bg-warning')}"
+                                                  th:text="${log.statusCode}">-</span>
+                    <span th:unless="${log.statusCode != null and log.statusCode > 0}"
+                          class="text-muted">N/A</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Batch ID:</strong></td>
+                  <td>
+                    <small class="text-muted font-monospace" th:text="${log.batchExecutionId}">-</small>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Error Message (if failed) -->
+          <div th:if="${!log.success and log.errorMessage != null}" class="mb-4">
+            <h6 class="text-danger">Error Details</h6>
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle"></i>
+              <strong>Error Message:</strong>
+              <pre class="mb-0 mt-2" th:text="${log.errorMessage}"></pre>
+            </div>
+          </div>
+
+          <!-- Response Body -->
+          <div th:if="${log.responseBody != null and !#strings.isEmpty(log.responseBody)}" class="mb-4">
+            <h6 class="text-success">Response Body</h6>
+            <div class="card">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <small class="text-muted">Response Content</small>
+                <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('responseBody')">
+                  <i class="fas fa-copy"></i> Copy
+                </button>
+              </div>
+              <div class="card-body">
+                <pre id="responseBody" class="language-json" th:text="${log.responseBody}"></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex justify-content-between">
+            <div>
+              <a href="/console/logs" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Logs
+              </a>
+              <a th:if="${log.targetServerId != null}"
+                 th:href="@{'/console/servers/' + ${log.targetServerId} + '/edit'}"
+                 class="btn btn-primary ms-2">
+                <i class="fas fa-server"></i> Edit Server
+              </a>
+            </div>
+            <div>
+              <button class="btn btn-info" onclick="testSameEndpoint()">
+                <i class="fas fa-redo"></i> Test Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Related Logs -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card shadow">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-info">
+            <i class="fas fa-history"></i> Recent Logs for This Server
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="text-center">
+            <a th:if="${log.targetServerId != null}"
+               th:href="@{'/console/servers/' + ${log.targetServerId} + '/logs'}"
+               class="btn btn-outline-info">
+              <i class="fas fa-list"></i> View All Logs for This Server
+            </a>
+            <span th:unless="${log.targetServerId != null}" class="text-muted">
+                                Server information not available
+                            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div th:fragment="scripts">
+  <script>
+    // Copy to clipboard function
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      const text = element.textContent;
+
+      navigator.clipboard.writeText(text).then(function() {
+        // Show success message
+        const button = event.target.closest('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+
+        setTimeout(function() {
+          button.innerHTML = originalText;
+          button.classList.remove('btn-success');
+          button.classList.add('btn-outline-secondary');
+        }, 2000);
+      }).catch(function(err) {
+        alert('Failed to copy to clipboard');
+      });
+    }
+
+    // Test same endpoint
+    function testSameEndpoint() {
+      if (confirm('This will trigger a health check for all active servers. Continue?')) {
+        $.post('/api/batch/trigger')
+          .done(function(data) {
+            alert('Health check triggered successfully! Check the logs in a moment.');
+          })
+          .fail(function() {
+            alert('Failed to trigger health check. Please try again.');
+          });
+      }
+    }
+
+    // Try to format JSON in response body
+    $(document).ready(function() {
+      const responseBody = document.getElementById('responseBody');
+      if (responseBody) {
+        const content = responseBody.textContent;
+        try {
+          const jsonObj = JSON.parse(content);
+          responseBody.textContent = JSON.stringify(jsonObj, null, 2);
+        } catch (e) {
+          // Not valid JSON, keep as is
+        }
+      }
+    });
+  </script>
+</div>
+</body>
+</html>

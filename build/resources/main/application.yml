@@ -1,0 +1,117 @@
+spring:
+  profiles:
+    active: dev
+  batch:
+    job:
+      enabled: false
+  application:
+    name: health-check-batch
+  datasource:
+    url: jdbc:h2:tcp://localhost/~/healthcheck
+    username: sa
+    password: healthcheck
+    driver-class-name: org.h2.Driver
+    # Initialize database with schema and data
+    # initialization-mode: always
+    # schema: classpath:schema.sql
+    # data: classpath:data.sql
+  h2:
+    console:
+      enabled: false
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  jpa:
+    hibernate:
+      ddl-auto: none  # Use schema.sql instead of auto-generation
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: true  # Load data.sql after schema.sql
+  #sql:
+  #  init:
+  #    mode: always
+  #    schema-locations: classpath:schema.sql
+  #    data-locations: classpath:data.sql
+  thymeleaf:
+    cache: false
+    mode: HTML
+
+logging:
+  level:
+    com.kica.ess.batch: DEBUG
+    org.springframework.batch: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/health-check-batch.log
+
+---
+spring:
+  profiles: dev
+
+batch:
+  health-check:
+    target-servers:
+      - name: "API Server 1"
+        url: "http://localhost:8080/api/health"
+        method: "GET"
+        timeout: 5000
+      - name: "API Server 2"
+        url: "http://localhost:8081/api/status"
+        method: "POST"
+        timeout: 3000
+        body: '{"service": "health-check"}'
+    schedule:
+      cron: "0 */5 * * * *"  # Every 5 minutes
+    timeout:
+      threshold: 10000  # 10 seconds
+    telegram:
+      bot-token: "8491933666:AAGLWQezSCobPYREf6dOMI4zxGhQC1ZD47Y"
+      chat-id: "8297520214"
+      enabled: true
+
+---
+spring:
+  profiles: prod
+
+batch:
+  health-check:
+    target-servers:
+      - name: "Production API Server"
+        url: "https://api.production.com/health"
+        method: "GET"
+        timeout: 5000
+      - name: "Payment Service"
+        url: "https://payment.production.com/status"
+        method: "POST"
+        timeout: 8000
+        body: '{"service": "payment", "check": "health"}'
+    schedule:
+      cron: "0 */2 * * * *"  # Every 2 minutes
+    timeout:
+      threshold: 15000  # 15 seconds
+    telegram:
+      bot-token: "8491933666:AAGLWQezSCobPYREf6dOMI4zxGhQC1ZD47Y"
+      chat-id: "8297520214"
+      enabled: true
+
+---
+spring:
+  profiles: test
+
+batch:
+  health-check:
+    target-servers:
+      - name: "Test Server"
+        url: "http://test.internal.com/health"
+        method: "GET"
+        timeout: 3000
+    schedule:
+      cron: "0 */10 * * * *"  # Every 10 minutes
+    timeout:
+      threshold: 8000  # 8 seconds
+    telegram:
+      bot-token: "8491933666:AAGLWQezSCobPYREf6dOMI4zxGhQC1ZD47Y"
+      chat-id: "8297520214"
+      enabled: false

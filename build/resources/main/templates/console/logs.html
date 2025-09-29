@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{console/layout :: layout(~{::content}, ~{::scripts}, 'Execution Logs')}">
+<head>
+  <title>Execution Logs</title>
+</head>
+<body>
+<div th:fragment="content">
+  <!-- Filters -->
+  <div class="row mb-3">
+    <div class="col-md-8">
+      <form method="get" action="/console/logs" class="row g-3">
+        <div class="col-md-4">
+          <input type="text" class="form-control" name="serverName"
+                 th:value="${serverNameFilter}" placeholder="Filter by server name...">
+        </div>
+        <div class="col-md-3">
+          <select class="form-control" name="success">
+            <option value="">All Status</option>
+            <option value="true" th:selected="${successFilter != null and successFilter}">Success Only</option>
+            <option value="false" th:selected="${successFilter != null and !successFilter}">Failures Only</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-outline-secondary">
+            <i class="fas fa-filter"></i> Filter
+          </button>
+        </div>
+        <div class="col-md-3">
+          <a href="/console/logs" class="btn btn-outline-secondary">
+            <i class="fas fa-times"></i> Clear
+          </a>
+        </div>
+      </form>
+    </div>
+    <div class="col-md-4 text-end">
+      <button class="btn btn-outline-info" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Logs Table -->
+  <div class="card shadow">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">
+        Execution Logs
+        <span th:if="${logsPage.totalElements > 0}" class="badge bg-info"
+              th:text="${logsPage.totalElements}">0</span>
+      </h6>
+    </div>
+    <div class="card-body">
+      <div th:if="${logsPage.totalElements == 0}" class="text-center text-muted py-4">
+        <i class="fas fa-list-alt fa-3x mb-3"></i>
+        <h5>No logs found</h5>
+        <p th:if="${serverNameFilter != null or successFilter != null}">
+          No logs match your filter criteria.
+        </p>
+        <p th:unless="${serverNameFilter != null or successFilter != null}">
+          No execution logs available yet. Run a health check to see logs here.
+        </p>
+      </div>
+
+      <div th:unless="${logsPage.totalElements == 0}" class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead>
+          <tr>
+            <th>Execution Time</th>
+            <th>Server</th>
+            <th>Method</th>
+            <th>Status</th>
+            <th>Response Time</th>
+            <th>Status Code</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="log : ${logsPage.content}"
+              th:class="${log.success ? 'log-success' : 'log-failure'}">
+            <td>
+              <span th:text="${#temporals.format(log.executionTime, 'MM-dd HH:mm:ss')}"></span>
+              <br>
+              <small class="text-muted" th:text="${log.batchExecutionId}"></small>
+            </td>
+            <td>
+              <strong th:text="${log.serverName}"></strong>
+              <br>
+              <small class="text-muted text-truncate" style="max-width: 200px; display: block;"
+                     th:text="${log.url}"></small>
+            </td>
+            <td>
+              <span class="badge bg-secondary" th:text="${log.method}"></span>
+            </td>
+            <td>
+                                    <span th:if="${log.success}" class="badge bg-success">
+                                        <i class="fas fa-check"></i> Success
+                                    </span>
+              <span th:unless="${log.success}" class="badge bg-danger">
+                                        <i class="fas fa-times"></i> Failed
+                                    </span>
+            </td>
+            <td>
+                                    <span th:class="${log.elapsedTimeMs < 1000 ? 'response-time-good' :
+                                                    (log.elapsedTimeMs < 5000 ? 'response-time-slow' : 'response-time-bad')}"
+                                          th:text="${log.elapsedTimeMs} + 'ms'"></span>
+            </td>
+            <td>
+                                    <span th:if="${log.statusCode != null and log.statusCode > 0}"
+                                          class="badge"
+                                          th:classappend="${log.statusCode >= 200 and log.statusCode < 300 ? 'bg-success' :
+                                                         (log.statusCode >= 400 ? 'bg-danger' : 'bg-warning')}"
+                                          th:text="${log.statusCode}"></span>
+              <span th:unless="${log.statusCode != null and log.statusCode > 0}"
+                    class="badge bg-secondary">N/A</span>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <a th:href="@{'/console/logs/' + ${log.id}}"
+                   class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="View Details">
+                  <i class="fas fa-eye"></i>
+                </a>
+                <a th:if="${log.targetServerId != null}"
+                   th:href="@{'/console/servers/' + ${log.targetServerId} + '/edit'}"
+                   class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit Server">
+                  <i class="fas fa-server"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div th:if="${logsPage.totalPages > 1}" class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          Showing <span th:text="${logsPage.size * logsPage.number + 1}">1</span> to
+          <span th:text="${logsPage.size * logsPage.number + logsPage.numberOfElements}">20</span> of
+          <span th:text="${logsPage.totalElements}">100</span> entries
+        </div>
+
+        <nav aria-label="Logs pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item" th:classappend="${logsPage.first} ? 'disabled'">
+              <a class="page-link"
+                 th:href="@{/console/logs(page=${logsPage.number - 1}, serverName=${serverNameFilter}, success=${successFilter})}">
+                Previous
+              </a>
+            </li>
+
+            <li th:each="pageNum : ${#numbers.sequence(0, logsPage.totalPages - 1)}"
+                th:if="${pageNum >= logsPage.number - 2 and pageNum <= logsPage.number + 2}"
+                class="page-item"
+                th:classappend="${pageNum == logsPage.number} ? 'active'">
+              <a class="page-link"
+                 th:href="@{/console/logs(page=${pageNum}, serverName=${serverNameFilter}, success=${successFilter})}"
+                 th:text="${pageNum + 1}">1</a>
+            </li>
+
+            <li class="page-item" th:classappend="${logsPage.last} ? 'disabled'">
+              <a class="page-link"
+                 th:href="@{/console/logs(page=${logsPage.number + 1}, serverName=${serverNameFilter}, success=${successFilter})}">
+                Next
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Stats -->
+  <div th:unless="${logsPage.totalElements == 0}" class="row mt-4">
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-success" th:text="${#lists.size(logsPage.content.?[success])}">0</h5>
+          <p class="card-text">Successful (This Page)</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-danger" th:text="${#lists.size(logsPage.content.?[!success])}">0</h5>
+          <p class="card-text">Failed (This Page)</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-info"
+              th:with="avgTime=${#aggregates.avg(logsPage.content.![elapsedTimeMs])}"
+              th:text="${#numbers.formatDecimal(avgTime, 0, 0)} + 'ms'">0ms</h5>
+          <p class="card-text">Avg Response Time</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-warning" th:text="${logsPage.totalElements}">0</h5>
+          <p class="card-text">Total Logs</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div th:fragment="scripts">
+  <script>
+    // Initialize tooltips
+    $(document).ready(function() {
+      $('[data-bs-toggle="tooltip"]').tooltip();
+    });
+
+    // Auto-refresh every 30 seconds if on first page with no filters
+    $(document).ready(function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const page = urlParams.get('page') || '0';
+      const hasFilters = urlParams.get('serverName') || urlParams.get('success');
+
+      if (page === '0' && !hasFilters) {
+        setTimeout(function() {
+          startAutoRefresh(30000);
+        }, 5000);
+      }
+    });
+  </script>
+</div>
+</body>
+</html>
